@@ -23,7 +23,22 @@ def read_corpus(fileobj):
         s.append(Token(line))
 
 
+def build_sentence_graph(word, sentences):
+    # связываем предложения, в которых есть интересующее нас слово
+    c = Counter()
+    g = Graph()
+    for i, s in enumerate(sentences):
+        ts = [t.text for t in s]
+        g.add_node(i, words=ts)
+        for word in ts:
+            for n in g.nodes():
+                if w in n.words:
+                    g.add_edge(i, n)
+    return g
+
+
 def build_graph(sentences):
+    # связываем слова, которые встречаются в одном предложении
     c = Counter()
     g = Graph()
     for s in sentences:
@@ -38,12 +53,19 @@ def build_graph(sentences):
                 g.add_edge(t.text, t1.text, weight=round(c[(t, t1)] / len(c), 4))
     return g
 
+
+def rank(g):
+    pr = nx.pagerank(g)
+    return pr
+
+
 if __name__ == '__main__':
     s = list(read_corpus(sys.stdin))
-    g = build_graph(s)
+    g = build_sentence_graph(s)
     pos = nx.spring_layout(g)
     nx.draw_networkx_nodes(g, pos)
     nx.draw_networkx_edges(g, pos)
     nx.draw_networkx_labels(g, pos)
-#    nx.draw_networkx_edge_labels(g, pos)
+    nx.draw_networkx_edge_labels(g, pos)
     plt.show()
+#    print rank(g)
