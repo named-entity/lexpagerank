@@ -1,72 +1,67 @@
-# coding: utf-8
-from collections import Counter
+# -*- coding: utf-8 -*-
+from collections import Counter, defaultdict
 
 import matplotlib.pyplot as plt
+import matplotlib
 import networkx as nx
+import re
 import sys
-from networkx.classes.graph import Graph
-from utils import Token, Sentence
+from networkx.classes.multigraph import MultiGraph
+from utils import read_corpus
 
 
-def read_corpus(fileobj):
-    s = []
-    for line in fileobj:
-        line = line.rstrip('\n').decode('utf-8').split('\t')
-        if not line[0]:
-            continue
-        if line[0] == 'sent':
-            yield s
-            s = []
-            continue
-        if line[0] == '/sent':
-            continue
-        s.append(Token(line))
+class Scorer(object):
+    def __init__(self):
+        pass
+
+    def __call__(self, *args, **kwargs):
+        pass
 
 
-def build_sentence_graph(word, sentences):
+class SGraph(MultiGraph):
+
+# собираем из всех предложений только те, в которых есть заданное слово
+# и строим граф
+    def load(self, w, sentences):
+        c = Counter()
+        words = defaultdict(list)
+        for i, s in enumerate(sentences):
+            s = [t.lemmas[0] for t in s]
+            if w in s:
+                self.add_node(i, data=s)
+                common_words = defaultdict(list)
+                for word in s:
+                    if word != w and re.match(u'\w+', word, re.U):
+                        words[word].append(i)
+                        for n in set(words[word]):
+                            common_words[n].append(word)
+                for n in common_words.keys():
+                    if n != i:
+                        for word in common_words[n]:
+                            self.add_edge(i, n, label=word, key=word, weight=1.0)
+
+
+def build_sentence_graph(w, sentences):
     # связываем предложения, в которых есть интересующее нас слово
-    c = Counter()
-    g = Graph()
-    for i, s in enumerate(sentences):
-        ts = [t.text for t in s]
-        g.add_node(i, words=ts)
-        for word in ts:
-            for n in g.nodes(data=True):
-            # добавлять вес - количество таких слов
-                if word in n[1]['words']:
-                    g.add_edge(i, n[0])
-    return g
-
-
-def build_graph(sentences):
-    # связываем слова, которые встречаются в одном предложении
-    c = Counter()
-    g = Graph()
-    for s in sentences:
-        for t in s:
-            for t1 in s:
-                c[(t, t1)] += 1.0
-    for s in sentences:
-        ts = [t.text for t in s]
-        g.add_nodes_from(ts)
-        for t in s:
-            for t1 in s:
-                g.add_edge(t.text, t1.text, weight=round(c[(t, t1)] / len(c), 4))
+    g = SGraph()
+    g.load(w, sentences)
     return g
 
 
 def rank(g):
     pr = nx.pagerank(g)
-    return pr
+    return sorted(pr.iteritems(), key=lambda x: x[1])
 
 
 if __name__ == '__main__':
+    matplotlib.rc('font', **{'sans-serif': 'Arial',
+                           'family': 'sans-serif'})
     s = list(read_corpus(sys.stdin))
-    g = build_sentence_graph(u'лицо', s)
+    g = build_sentence_graph(u'замок', s)
     pos = nx.spring_layout(g)
     nx.draw_networkx_nodes(g, pos)
     nx.draw_networkx_edges(g, pos)
-#    nx.draw_networkx_labels(g, pos)
-#    nx.draw_networkx_edge_labels(g, pos)
+    nx.draw_networkx_labels(g, pos)
+    nx.draw_networkx_edge_labels(g, pos, edge_labels=dict(zip(g.edges(), (d['label'] for (u, v, d) in g.edges(data=True)))),
+                                 label_pos=0.3)
     plt.show()
-#    print rank(g)
