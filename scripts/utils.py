@@ -1,12 +1,19 @@
 # coding: utf-8
 from pymorphy2 import MorphAnalyzer
+from pymorphy2.tokenizers import simple_word_tokenize
 
 
 def read_lemmas(fileobj):
     # здесь на каждой строчке по предложению (токенизованному)
     m = MorphAnalyzer()
     for line in fileobj:
-        yield [m.parse(t)[0].normal_form for t in line.decode('utf-8').split()]
+        yield [m.parse(t)[0].normal_form for t in line.decode('utf-8').split()[1:]]
+
+
+def read_text_lemmas(fileobj):
+    m = MorphAnalyzer()
+    for line in fileobj:
+        yield ' '.join((m.parse(t)[0].normal_form for t in simple_word_tokenize(line.decode('utf-8'))))
 
 
 def read_corpus(fileobj, m=None):
@@ -52,5 +59,6 @@ class Sentence(list):
 
 if __name__ == '__main__':
     import sys
-    for s in read_corpus(sys.stdin):
-        print ' '.join((t.text for t in s)).encode('utf-8')
+    for s in read_text_lemmas(sys.stdin):
+#        print ' '.join((t.text for t in s)).encode('utf-8')
+        print s.encode('utf-8')
